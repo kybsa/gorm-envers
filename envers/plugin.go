@@ -1,28 +1,45 @@
 package envers
 
 import (
-	"fmt"
-
 	"gorm.io/gorm"
 )
 
 type gormEnversPlugin struct {
+	Config config
+	sqlAud sqlAud
 }
 
-func NewGormEnversPlugin() gorm.Plugin {
-	return &gormEnversPlugin{}
+func NewGormEnversPlugin(config config) gorm.Plugin {
+	return &gormEnversPlugin{Config: config, sqlAud: *NewSQLAud(config)}
 }
 
 func (_self *gormEnversPlugin) Initialize(db *gorm.DB) error {
-	fmt.Println("Start: Initialize")
 
-	// TODO Check if a entity support aud table
+	if _self.Config.ShowDebugInfo {
+		db.Config.Logger.Info(db.Statement.Context, "Start Initialize:"+_self.Name())
+	}
 
-	db.Callback().Create().After("gorm:create").Register("create_at", _self.create)
-	db.Callback().Update().After("gorm:update").Register("update_at", _self.update)
-	db.Callback().Delete().After("gorm:delete").Register("delete_at", _self.delete)
+	err := db.Callback().Create().After("gorm:create").Register(_self.Name()+".create_at", _self.create)
+	if err != nil {
+		db.Config.Logger.Error(db.Statement.Context, _self.Name()+" fail to register create callback")
+		return err
+	}
 
-	fmt.Println("End  : Initialize")
+	err = db.Callback().Update().After("gorm:update").Register(_self.Name()+".update_at", _self.update)
+	if err != nil {
+		db.Config.Logger.Error(db.Statement.Context, _self.Name()+" fail to register update callback")
+		return err
+	}
+
+	db.Callback().Delete().After("gorm:delete").Register(_self.Name()+".delete_at", _self.delete)
+	if err != nil {
+		db.Config.Logger.Error(db.Statement.Context, _self.Name()+" fail to register delete callback")
+		return err
+	}
+
+	if _self.Config.ShowDebugInfo {
+		db.Config.Logger.Info(db.Statement.Context, "Success Initialize:"+_self.Name())
+	}
 
 	return nil
 }
@@ -31,13 +48,13 @@ func (_self *gormEnversPlugin) Name() string {
 	return "GORM-ENVERS"
 }
 func (_self *gormEnversPlugin) create(db *gorm.DB) {
-	createSQLAud(db, Add)
+	_self.sqlAud.createSQLAud(db, Add)
 }
 
 func (_self *gormEnversPlugin) update(db *gorm.DB) {
-	createSQLAud(db, Update)
+	_self.sqlAud.createSQLAud(db, Update)
 }
 
 func (_self *gormEnversPlugin) delete(db *gorm.DB) {
-	createSQLAud(db, Del)
+	_self.sqlAud.createSQLAud(db, Del)
 }

@@ -9,71 +9,85 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func createSQLAud(db *gorm.DB, audType int) {
+var auditedType = reflect.TypeOf((*Audited)(nil)).Elem()
+
+type sqlAud struct {
+	config config
+}
+
+func NewSQLAud(config config) *sqlAud {
+	return &sqlAud{config: config}
+}
+
+func (_self *sqlAud) createSQLAud(db *gorm.DB, audType int) {
 	if db.Statement.Schema == nil {
 		return
 	}
 
 	modelType := db.Statement.Schema.ModelType
-	auditedType := reflect.TypeOf((*Audited)(nil)).Elem()
-	if modelType.Implements(auditedType) {
-		fmt.Println("AUDITED TYPE")
-	} else {
-		fmt.Println("NO AUDITED TYPE")
+	if !modelType.Implements(auditedType) {
 		return
 	}
 
-	fmt.Println("Create Table:", db.Statement.Schema.Table)
+	if _self.config.ShowDebugInfo {
+		db.Config.Logger.Info(db.Statement.Context, "Start creating audit data to table:{%s} model:{%s.%s}", db.Statement.Schema.Table, db.Statement.Schema.ModelType.PkgPath(), db.Statement.Schema.ModelType.Name())
+	}
 
 	revtstmp := time.Now().UnixMilli()
 	var rev int64
 	ndb, _ := db.DB()
-	result, errSql := ndb.Query("insert into revinfo (revtstmp) VALUES(" + fmt.Sprint(revtstmp) + ") RETURNING rev") // tabla quemada
+	sqlInsertRevInfo := "insert into " + _self.config.RevinfoTableName + " (" + _self.config.RevtstmpColumnName + ") VALUES(" + fmt.Sprint(revtstmp) + ") RETURNING " + _self.config.RevColumnName
+	if _self.config.ShowSQL {
+		db.Config.Logger.Info(db.Statement.Context, sqlInsertRevInfo)
+	}
+	result, errSql := ndb.Query(sqlInsertRevInfo)
 	if errSql != nil {
-		fmt.Println(errSql)
+		db.Config.Logger.Error(db.Statement.Context, "fail to insert revinfo data", errSql)
 		return
 	}
 	result.Next()
 	result.Scan(&rev)
 
-	fmt.Println("Table:", db.Statement.Schema.Table, " ModelType:", db.Statement.Schema.ModelType)
-
-	tableName := db.Statement.Schema.Table + "_aud" // TODO Remove suffix hard code
+	tableName := db.Statement.Schema.Table + _self.config.AuditTableSuffix
 
 	if audType == Del || audType == Update {
-		updateRevEndFields(db, tableName, rev, revtstmp)
+		_self.updateRevEndFields(db, tableName, rev, revtstmp)
 	}
 
 	sqlTable := "insert into " + tableName
-	sqlColumns := createSqlColumns(db.Statement.Schema.Fields)
-	sqlValues := createSqlValues(db)
-	values := createValues(db, rev, audType)
+	sqlColumns := _self.createSqlColumns(db.Statement.Schema.Fields)
+	sqlValues := _self.createSqlValues(db)
+	values := _self.createValues(db, rev, audType)
 	sql := sqlTable + sqlColumns + sqlValues
-	fmt.Println(sql)
-	result, errAud := ndb.Query(sql, values...)
-	fmt.Println(errAud)
-	fmt.Println(result)
+	if _self.config.ShowSQL {
+		db.Config.Logger.Info(db.Statement.Context, sql)
+
+	}
+	_, errAud := ndb.Query(sql, values...)
+	if errAud != nil {
+		db.Config.Logger.Error(db.Statement.Context, "fail to insert audit data", sql)
+	}
 }
 
-func getNumberOfTuples(db *gorm.DB) int {
+func (_self *sqlAud) getNumberOfTuples(db *gorm.DB) int {
 	if db.Statement.ReflectValue.Kind() == reflect.Array || db.Statement.ReflectValue.Kind() == reflect.Slice {
 		return db.Statement.ReflectValue.Len()
 	}
 	return 1
 }
 
-func createSqlColumns(fields []*schema.Field) string {
+func (_self *sqlAud) createSqlColumns(fields []*schema.Field) string {
 	sqlColumns := " ("
 	for _, field := range fields {
 		sqlColumns += field.DBName
 		sqlColumns += ","
 	}
-	sqlColumns += "rev,revtype) " // Remove column names hard code
+	sqlColumns += _self.config.RevColumnName + "," + _self.config.RevtypeColumnName + ") "
 	return sqlColumns
 }
 
-func createSqlValues(db *gorm.DB) string {
-	tuplasSize := getNumberOfTuples(db)
+func (_self *sqlAud) createSqlValues(db *gorm.DB) string {
+	tuplasSize := _self.getNumberOfTuples(db)
 	numFields := len(db.Statement.Schema.Fields)
 	sqlValues := " VALUES"
 
@@ -92,8 +106,8 @@ func createSqlValues(db *gorm.DB) string {
 	return sqlValues
 }
 
-func createValues(db *gorm.DB, rev int64, audType int) []interface{} {
-	tuplasSize := getNumberOfTuples(db)
+func (_self *sqlAud) createValues(db *gorm.DB, rev int64, audType int) []interface{} {
+	tuplasSize := _self.getNumberOfTuples(db)
 	numFields := len(db.Statement.Schema.Fields) + 2
 	values := make([]interface{}, 0, tuplasSize*numFields)
 
@@ -120,10 +134,10 @@ func createValues(db *gorm.DB, rev int64, audType int) []interface{} {
 	return values
 }
 
-func updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp int64) {
+func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp int64) {
 	ndb, errDb := db.DB()
 	if errDb != nil {
-		fmt.Println(errDb)
+		db.Config.Logger.Error(db.Statement.Context, "fail to get Db instance", errDb)
 		return
 	}
 
@@ -133,7 +147,7 @@ func updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp in
 	// Get where pk
 	indexId := 3
 	wherePk := ""
-	tuplasSize := getNumberOfTuples(db)
+	tuplasSize := _self.getNumberOfTuples(db)
 
 	if tuplasSize == 1 {
 		for _, field := range db.Statement.Schema.Fields {
@@ -175,8 +189,14 @@ func updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp in
 			}
 		}
 	}
-	_, errUpdate := ndb.Query("update "+tableName+" set revend=$1, revend_tstmp=$2 where "+wherePk+" and revend is null", values...) // Remove columns hardcode
+	sqlUpdate := fmt.Sprintf("update %s set %s=$1, %s=$2 where %s and %s is null",
+		tableName,
+		_self.config.RevendColumnName,
+		_self.config.RevendTstmpColumnName,
+		wherePk,
+		_self.config.RevendColumnName)
+	_, errUpdate := ndb.Query(sqlUpdate, values...)
 	if errUpdate != nil {
-		fmt.Println(errUpdate)
+		db.Config.Logger.Error(db.Statement.Context, "fail to update revend fields", errDb)
 	}
 }
