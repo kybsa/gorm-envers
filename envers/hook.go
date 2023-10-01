@@ -19,6 +19,10 @@ type Revinfo struct {
 	Revtstmp int64
 }
 
+func (Revinfo) TableName() string {
+	return "revinfo"
+}
+
 func AfterCreate(tx *gorm.DB, e interface{}) (err error) {
 	revtstmp := time.Now().UnixMilli()
 	revInfo := Revinfo{Revtstmp: revtstmp}
