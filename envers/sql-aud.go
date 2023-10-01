@@ -9,117 +9,17 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-const Add = 0
-const Update = 1
-const Del = 2
-
-func AfterCreate(tx *gorm.DB, e interface{}) (err error) {
-	revtstmp := time.Now().UnixMilli()
-	revInfo := Revinfo{Revtstmp: revtstmp}
-	result := tx.Create(&revInfo)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	values := reflect.ValueOf(e)
-	elem := values.Elem()
-
-	revField := elem.FieldByName("Rev")
-	revField.SetUint(uint64(revInfo.Rev))
-
-	revtypeField := elem.FieldByName("Revtype")
-	revtypeField.SetUint(uint64(Add))
-
-	result = tx.Create(e)
-
-	return result.Error
-}
-
-func AfterUpdate(tx *gorm.DB, emptyModel interface{}, columnIdName string, id interface{}, e interface{}) (err error) {
-	revtstmp := time.Now().UnixMilli()
-	revInfo := Revinfo{Revtstmp: revtstmp}
-	result := tx.Create(&revInfo)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	// TODO Remove column names hard code
-	result = tx.Model(emptyModel).Where(columnIdName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
-	if result.Error != nil {
-		return result.Error
-	}
-
-	values := reflect.ValueOf(e)
-	elem := values.Elem()
-	revField := elem.FieldByName("Rev")
-	revField.SetUint(uint64(revInfo.Rev))
-
-	revtypeField := elem.FieldByName("Revtype")
-	revtypeField.SetUint(uint64(Update))
-
-	result = tx.Create(e)
-
-	return result.Error // TODO
-}
-func AfterDelete(tx *gorm.DB, emptyModel interface{}, columnIdName string, id interface{}, e interface{}) (err error) {
-	revtstmp := time.Now().UnixMilli()
-	revInfo := Revinfo{Revtstmp: revtstmp}
-	result := tx.Create(&revInfo)
-	if result.Error != nil {
-		return result.Error
-	}
-
-	// TODO Remove column names hard code
-	result = tx.Model(emptyModel).Where(columnIdName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
-	if result.Error != nil {
-		return result.Error
-	}
-
-	values := reflect.ValueOf(e)
-	elem := values.Elem()
-	revField := elem.FieldByName("Rev")
-	revField.SetUint(uint64(revInfo.Rev))
-
-	revtypeField := elem.FieldByName("Revtype")
-	revtypeField.SetUint(uint64(Del))
-
-	result = tx.Create(e)
-
-	return result.Error
-}
-
-type AudData struct {
-	Rev         uint
-	Revtype     uint8
-	Revend      *uint
-	RevendTstmp *int64
-}
-
-type Revinfo struct {
-	Rev      uint `gorm:"primaryKey;autoIncrement:true;column:rev"`
-	Revtstmp int64
-}
-
-type GormEnversPlugin struct {
-}
-
-func (_self *GormEnversPlugin) Name() string {
-	return "GORM-ENVERS"
-}
-func (_self *GormEnversPlugin) Create(db *gorm.DB) {
-	_self.CreateAud(db, Add)
-}
-
-func (_self *GormEnversPlugin) Update(db *gorm.DB) {
-	_self.CreateAud(db, Update)
-}
-
-func (_self *GormEnversPlugin) Delete(db *gorm.DB) {
-	_self.CreateAud(db, Del)
-}
-
-func (_self *GormEnversPlugin) CreateAud(db *gorm.DB, audType int) {
+func createSQLAud(db *gorm.DB, audType int) {
 	if db.Statement.Schema == nil {
+		return
+	}
+
+	modelType := db.Statement.Schema.ModelType
+	auditedType := reflect.TypeOf((*Audited)(nil)).Elem()
+	if modelType.Implements(auditedType) {
+		fmt.Println("AUDITED TYPE")
+	} else {
+		fmt.Println("NO AUDITED TYPE")
 		return
 	}
 
@@ -279,16 +179,4 @@ func updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp in
 	if errUpdate != nil {
 		fmt.Println(errUpdate)
 	}
-}
-
-func (_self *GormEnversPlugin) Initialize(db *gorm.DB) error {
-	fmt.Println("Start: Initialize")
-
-	db.Callback().Create().After("gorm:create").Register("create_at", _self.Create)
-	db.Callback().Update().After("gorm:update").Register("update_at", _self.Update)
-	db.Callback().Delete().After("gorm:delete").Register("delete_at", _self.Delete)
-
-	fmt.Println("End  : Initialize")
-
-	return nil
 }
