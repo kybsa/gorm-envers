@@ -61,11 +61,10 @@ func (_self *sqlAud) createSQLAud(db *gorm.DB, audType int) {
 	sql := sqlTable + sqlColumns + sqlValues
 	if _self.config.ShowSQL {
 		db.Config.Logger.Info(db.Statement.Context, sql)
-
 	}
 	_, errAud := ndb.Query(sql, values...)
 	if errAud != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to insert audit data", sql)
+		db.Config.Logger.Error(db.Statement.Context, "fail to insert audit data", errAud.Error())
 	}
 }
 
@@ -137,7 +136,7 @@ func (_self *sqlAud) createValues(db *gorm.DB, rev int64, audType int) []interfa
 func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp int64) {
 	ndb, errDb := db.DB()
 	if errDb != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to get Db instance", errDb)
+		db.Config.Logger.Error(db.Statement.Context, "fail to get Db instance", errDb.Error())
 		return
 	}
 
@@ -197,6 +196,6 @@ func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend in
 		_self.config.RevendColumnName)
 	_, errUpdate := ndb.Query(sqlUpdate, values...)
 	if errUpdate != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to update revend fields", errDb)
+		db.Config.Logger.Error(db.Statement.Context, "fail to update revend fields", errDb.Error())
 	}
 }

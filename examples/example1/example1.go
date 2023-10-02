@@ -33,8 +33,7 @@ func main() {
 	if err != nil {
 		panic("failed to connect database")
 	}
-	e := envers.Revinfo{}
-	e.TableName()
+
 	db.AutoMigrate(&A{}, &envers.Revinfo{}, &AsAud{})
 
 	a := &A{Name: "A-1"}
