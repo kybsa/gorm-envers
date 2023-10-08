@@ -46,7 +46,11 @@ func (_self *sqlAud) createSQLAud(db *gorm.DB, audType int) {
 		return
 	}
 	result.Next()
-	result.Scan(&rev)
+	errScan := result.Scan(&rev)
+	if errScan != nil {
+		db.Config.Logger.Error(db.Statement.Context, "fail to get rev data", errScan)
+		return
+	}
 
 	tableName := db.Statement.Schema.Table + _self.config.AuditTableSuffix
 

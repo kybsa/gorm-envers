@@ -31,7 +31,7 @@ func (_self *gormEnversPlugin) Initialize(db *gorm.DB) error {
 		return err
 	}
 
-	db.Callback().Delete().After("gorm:delete").Register(_self.Name()+".delete_at", _self.delete)
+	err = db.Callback().Delete().After("gorm:delete").Register(_self.Name()+".delete_at", _self.delete)
 	if err != nil {
 		db.Config.Logger.Error(db.Statement.Context, _self.Name()+" fail to register delete callback")
 		return err
