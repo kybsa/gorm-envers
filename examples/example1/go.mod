@@ -1,6 +1,6 @@
 module example1
 
-go 1.21.0
+go 1.18
 
 require (
 	github.com/kybsa/gorm-envers v0.0.0-20231002010237-5ff29dfd2ec0

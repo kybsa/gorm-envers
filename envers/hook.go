@@ -45,7 +45,7 @@ func AfterCreate(tx *gorm.DB, e interface{}) (err error) {
 	return result.Error
 }
 
-func AfterUpdate(tx *gorm.DB, emptyModel interface{}, columnIdName string, id interface{}, e interface{}) (err error) {
+func AfterUpdate(tx *gorm.DB, emptyModel interface{}, columnIDName string, id interface{}, e interface{}) (err error) {
 	revtstmp := time.Now().UnixMilli()
 	revInfo := Revinfo{Revtstmp: revtstmp}
 	result := tx.Create(&revInfo)
@@ -54,7 +54,7 @@ func AfterUpdate(tx *gorm.DB, emptyModel interface{}, columnIdName string, id in
 	}
 
 	// TODO Remove column names hard code
-	result = tx.Model(emptyModel).Where(columnIdName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
+	result = tx.Model(emptyModel).Where(columnIDName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -71,7 +71,8 @@ func AfterUpdate(tx *gorm.DB, emptyModel interface{}, columnIdName string, id in
 
 	return result.Error // TODO
 }
-func AfterDelete(tx *gorm.DB, emptyModel interface{}, columnIdName string, id interface{}, e interface{}) (err error) {
+
+func AfterDelete(tx *gorm.DB, emptyModel interface{}, columnIDName string, id interface{}, e interface{}) (err error) {
 	revtstmp := time.Now().UnixMilli()
 	revInfo := Revinfo{Revtstmp: revtstmp}
 	result := tx.Create(&revInfo)
@@ -80,7 +81,7 @@ func AfterDelete(tx *gorm.DB, emptyModel interface{}, columnIdName string, id in
 	}
 
 	// TODO Remove column names hard code
-	result = tx.Model(emptyModel).Where(columnIdName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
+	result = tx.Model(emptyModel).Where(columnIDName+"= ? and revend is null", id).Updates(map[string]interface{}{"revend": revInfo.Rev, "revend_tstmp": revtstmp})
 	if result.Error != nil {
 		return result.Error
 	}

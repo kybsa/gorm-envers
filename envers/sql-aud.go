@@ -40,9 +40,9 @@ func (_self *sqlAud) createSQLAud(db *gorm.DB, audType int) {
 	if _self.config.ShowSQL {
 		db.Config.Logger.Info(db.Statement.Context, sqlInsertRevInfo)
 	}
-	result, errSql := ndb.Query(sqlInsertRevInfo)
-	if errSql != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to insert revinfo data", errSql)
+	result, errSQL := ndb.Query(sqlInsertRevInfo)
+	if errSQL != nil {
+		db.Config.Logger.Error(db.Statement.Context, "fail to insert revinfo data", errSQL)
 		return
 	}
 	result.Next()
@@ -55,8 +55,8 @@ func (_self *sqlAud) createSQLAud(db *gorm.DB, audType int) {
 	}
 
 	sqlTable := "insert into " + tableName
-	sqlColumns := _self.createSqlColumns(db.Statement.Schema.Fields)
-	sqlValues := _self.createSqlValues(db)
+	sqlColumns := _self.createSQLColumns(db.Statement.Schema.Fields)
+	sqlValues := _self.createSQLValues(db)
 	values := _self.createValues(db, rev, audType)
 	sql := sqlTable + sqlColumns + sqlValues
 	if _self.config.ShowSQL {
@@ -75,7 +75,7 @@ func (_self *sqlAud) getNumberOfTuples(db *gorm.DB) int {
 	return 1
 }
 
-func (_self *sqlAud) createSqlColumns(fields []*schema.Field) string {
+func (_self *sqlAud) createSQLColumns(fields []*schema.Field) string {
 	sqlColumns := " ("
 	for _, field := range fields {
 		sqlColumns += field.DBName
@@ -85,7 +85,7 @@ func (_self *sqlAud) createSqlColumns(fields []*schema.Field) string {
 	return sqlColumns
 }
 
-func (_self *sqlAud) createSqlValues(db *gorm.DB) string {
+func (_self *sqlAud) createSQLValues(db *gorm.DB) string {
 	tuplasSize := _self.getNumberOfTuples(db)
 	numFields := len(db.Statement.Schema.Fields)
 	sqlValues := " VALUES"
@@ -134,9 +134,9 @@ func (_self *sqlAud) createValues(db *gorm.DB, rev int64, audType int) []interfa
 }
 
 func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend int64, revtstmp int64) {
-	ndb, errDb := db.DB()
-	if errDb != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to get Db instance", errDb.Error())
+	ndb, errDB := db.DB()
+	if errDB != nil {
+		db.Config.Logger.Error(db.Statement.Context, "fail to get Db instance", errDB.Error())
 		return
 	}
 
@@ -144,7 +144,7 @@ func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend in
 	values = append(values, revend, revtstmp)
 
 	// Get where pk
-	indexId := 3
+	indexID := 3
 	wherePk := ""
 	tuplasSize := _self.getNumberOfTuples(db)
 
@@ -155,8 +155,8 @@ func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend in
 					wherePk += " and "
 				}
 				wherePk += field.DBName
-				wherePk += "=$" + fmt.Sprint(indexId)
-				indexId++
+				wherePk += "=$" + fmt.Sprint(indexID)
+				indexID++
 
 				if fieldValue, isZero := field.ValueOf(db.Statement.Context, db.Statement.ReflectValue); !isZero {
 					values = append(values, fieldValue)
@@ -173,8 +173,8 @@ func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend in
 						wherePkEntity += " and "
 					}
 					wherePkEntity += field.DBName
-					wherePkEntity += "=$" + fmt.Sprint(indexId)
-					indexId++
+					wherePkEntity += "=$" + fmt.Sprint(indexID)
+					indexID++
 
 					if fieldValue, isZero := field.ValueOf(db.Statement.Context, db.Statement.ReflectValue.Index(i)); !isZero {
 						values = append(values, fieldValue)
@@ -196,6 +196,6 @@ func (_self *sqlAud) updateRevEndFields(db *gorm.DB, tableName string, revend in
 		_self.config.RevendColumnName)
 	_, errUpdate := ndb.Query(sqlUpdate, values...)
 	if errUpdate != nil {
-		db.Config.Logger.Error(db.Statement.Context, "fail to update revend fields", errDb.Error())
+		db.Config.Logger.Error(db.Statement.Context, "fail to update revend fields", errDB.Error())
 	}
 }

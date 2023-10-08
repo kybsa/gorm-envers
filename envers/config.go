@@ -1,3 +1,4 @@
+// Package envers with config utils
 package envers
 
 func NewConfig() config {
