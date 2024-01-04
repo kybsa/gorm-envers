@@ -119,6 +119,8 @@ func (_self *sqlAud) createValues(db *gorm.DB, rev int64, audType int) []interfa
 			for _, field := range db.Statement.Schema.Fields {
 				if fieldValue, isZero := field.ValueOf(db.Statement.Context, db.Statement.ReflectValue.Index(i)); !isZero {
 					values = append(values, fieldValue)
+				} else {
+					values = append(values, nil)
 				}
 			}
 			values = append(values, rev)
@@ -128,6 +130,8 @@ func (_self *sqlAud) createValues(db *gorm.DB, rev int64, audType int) []interfa
 		for _, field := range db.Statement.Schema.Fields {
 			if fieldValue, isZero := field.ValueOf(db.Statement.Context, db.Statement.ReflectValue); !isZero {
 				values = append(values, fieldValue)
+			} else {
+				values = append(values, nil)
 			}
 		}
 		values = append(values, rev)
